@@ -1,0 +1,13 @@
+/data/
+*.exe
+*.dll
+*.so
+*.dylib
+todo-api
+bin/
+/out/
+.env
+.DS_Store
+.idea/
+.vscode/
+.logs/

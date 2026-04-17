@@ -1,0 +1,8 @@
+.git
+.gitignore
+.dockerignore
+.logs
+.vscode
+.idea
+data
+*.md
