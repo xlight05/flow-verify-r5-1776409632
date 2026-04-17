@@ -1,0 +1,27 @@
+{
+  "overview": "A single-service REST API for managing todo items, implemented in Go with net/http on port 9090. The service exposes list, create, and delete endpoints over HTTP with JSON payloads, uses file-based persistence for durability across restarts, and applies a mutex for safe concurrent access.",
+  "requirements": [
+    "Provide GET /todos endpoint returning all todos ordered by creation time, 200 with empty array when none exist",
+    "Provide POST /todos endpoint accepting JSON {title}, validating non-empty title with max 255 chars, returning 201 with generated id and createdAt",
+    "Provide DELETE /todos/{id} endpoint returning 204 on success and 404 if not found",
+    "Each todo has id (UUID), title, completed (bool, default false), createdAt (RFC3339)",
+    "Return 400 for validation errors and malformed JSON, 404 for missing resources, 500 for server errors, all with consistent {error, code} JSON shape",
+    "Persist todos across restarts via file-based storage",
+    "Ensure concurrency safety with mutex-protected access and unique IDs",
+    "Expose /health endpoint",
+    "Log all requests and errors"
+  ],
+  "components": [
+    {
+      "name": "todo-api",
+      "componentType": "service",
+      "language": "Go",
+      "dependsOn": [],
+      "entrypoint": "deployment/service",
+      "buildpack": "docker",
+      "appPath": "/todo-api",
+      "openAPISpec": "openapi: 3.0.3\ninfo:\n  title: Todo API\n  version: 1.0.0\nservers:\n  - url: http://localhost:9090\npaths:\n  /health:\n    get:\n      summary: Health check\n      responses:\n        '200':\n          description: OK\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  status: {type: string}\n  /todos:\n    get:\n      summary: List todos\n      responses:\n        '200':\n          description: List of todos\n          content:\n            application/json:\n              schema:\n                type: array\n                items: {$ref: '#/components/schemas/Todo'}\n    post:\n      summary: Create todo\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema: {$ref: '#/components/schemas/CreateTodoRequest'}\n      responses:\n        '201':\n          description: Created\n          content:\n            application/json:\n              schema: {$ref: '#/components/schemas/Todo'}\n        '400':\n          description: Validation error\n          content:\n            application/json:\n              schema: {$ref: '#/components/schemas/Error'}\n  /todos/{id}:\n    delete:\n      summary: Delete todo\n      parameters:\n        - name: id\n          in: path\n          required: true\n          schema: {type: string}\n      responses:\n        '204': {description: Deleted}\n        '404':\n          description: Not found\n          content:\n            application/json:\n              schema: {$ref: '#/components/schemas/Error'}\ncomponents:\n  schemas:\n    Todo:\n      type: object\n      properties:\n        id: {type: string}\n        title: {type: string}\n        completed: {type: boolean}\n        createdAt: {type: string, format: date-time}\n    CreateTodoRequest:\n      type: object\n      required: [title]\n      properties:\n        title: {type: string, maxLength: 255}\n        completed: {type: boolean}\n    Error:\n      type: object\n      properties:\n        error: {type: string}\n        code: {type: string}\n",
+      "componentAgentInstructions": "Build a Go service using net/http on port 9090. Endpoints: GET /health -\u003e {status:\"ok\"}; GET /todos -\u003e JSON array sorted by createdAt ascending (empty array if none); POST /todos -\u003e accept JSON {title, completed?}, validate title non-empty and \u003c=255 chars, generate UUID id, set createdAt=time.Now().UTC().Format(RFC3339), default completed=false, return 201 with created todo; DELETE /todos/{id} -\u003e 204 if deleted, 404 with {error,code} if not found. Error response shape: {\"error\":\"msg\",\"code\":\"CODE\"}. Use codes VALIDATION_ERROR (400), INVALID_JSON (400), NOT_FOUND (404), INTERNAL_ERROR (500). Content-Type application/json for all responses. Use sync.RWMutex protecting an in-memory map plus persist to a JSON file (path from env TODO_DATA_FILE, default /data/todos.json) on every write; load on startup (create empty if missing). Use google/uuid for ids. Log each request (method, path, status, duration) and errors via log package. Recover from panics in middleware returning 500 INTERNAL_ERROR without leaking details. Dockerfile: multi-stage build, final image runs binary, EXPOSE 9090, create /data dir."
+    }
+  ]
+}
